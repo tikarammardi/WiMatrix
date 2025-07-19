@@ -1,7 +1,3 @@
-//
-// Created by Tikaram Mardi on 19/07/25.
-//
-
 #ifndef CONFIG_H
 #define CONFIG_H
 
@@ -19,5 +15,10 @@
 // Display Settings
 #define DEFAULT_BRIGHTNESS 5  // 0-15 range
 #define DEFAULT_SCROLL_SPEED 60
+
+// WiFi Configuration
+#define WIFI_CONNECTION_TIMEOUT 30  // seconds
+#define WIFI_RETRY_DELAY 1000       // milliseconds
+
 
 #endif // CONFIG_H
