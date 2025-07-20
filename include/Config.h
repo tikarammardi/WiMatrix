@@ -13,67 +13,50 @@
 #define CLK_PIN   D5   // GPIO14 - CLK
 #define CS_PIN    D6   // GPIO12 - CS/LOAD
 
-// Display Settings
-#define DEFAULT_BRIGHTNESS 5      // 0-15 range
-#define DEFAULT_SCROLL_SPEED 60   // milliseconds
+// Display Settings - Optimized for 8x32
+#define DEFAULT_BRIGHTNESS 3
+#define DEFAULT_SCROLL_SPEED 80
 #define MIN_BRIGHTNESS 0
-#define MAX_BRIGHTNESS 15
-#define MIN_SPEED 20
-#define MAX_SPEED 200
+#define MAX_BRIGHTNESS 8
+#define MIN_SPEED 40
+#define MAX_SPEED 150
 
-// Time Display Settings
-#define MODE_SWITCH_INTERVAL 5000  // 5 seconds between modes
-#define NTP_UPDATE_INTERVAL 60000  // Update NTP every minute
-#define IST_OFFSET 19800          // IST offset in seconds (5.5 hours)
+// Time Display Settings - Optimized for small display
+#define MODE_SWITCH_INTERVAL 3000  // 3 seconds for 8x32
+#define NTP_UPDATE_INTERVAL 60000
+#define IST_OFFSET 19800
 
 // WiFi Configuration
-#define WIFI_CONNECTION_TIMEOUT 30  // seconds
-#define WIFI_RETRY_DELAY 1000       // milliseconds
+#define WIFI_CONNECTION_TIMEOUT 30  // seconds to wait for WiFi connection
+#define WIFI_RETRY_DELAY 1000       // milliseconds between connection attempts
 
 // Display Modes
 enum DisplayMode {
-    MODE_MANUAL,     // Manual message control via web
-    MODE_CLOCK,      // Time display
-    MODE_DAY,        // Day of week
-    MODE_DATE,       // Date display
-    MODE_SCROLL,     // Scroll text
-    MODE_AUTO_CYCLE  // Auto cycle through all modes
+    MODE_MANUAL,     // Show custom message only
+    MODE_CLOCK,      // Show clock only
+    MODE_DAY,        // Day of week only
+    MODE_DATE,       // Date only
+    MODE_SCROLL,     // Scroll text only
+    MODE_AUTO_CYCLE  // Auto cycle through enabled modes
 };
 
-// Animation Effects
-struct AnimationEffect {
-    const char* name;
-    textEffect_t effectIn;
-    textEffect_t effectOut;
+// Mode Enable/Disable Structure
+struct ModeSettings {
+    bool clockEnabled = true;
+    bool dayEnabled = true;
+    bool dateEnabled = true;
+    bool messageEnabled = true;
+    int cycleInterval = 3; // seconds
 };
 
-// Available animation effects
-static const AnimationEffect ANIMATION_EFFECTS[] = {
-    {"Scroll Left", PA_SCROLL_LEFT, PA_SCROLL_LEFT},
-    {"Scroll Right", PA_SCROLL_RIGHT, PA_SCROLL_RIGHT},
-    {"Scroll Up", PA_SCROLL_UP, PA_SCROLL_UP},
-    {"Scroll Down", PA_SCROLL_DOWN, PA_SCROLL_DOWN},
-    {"Wipe", PA_WIPE, PA_WIPE},
-    {"Wipe Curve", PA_WIPE_CURSOR, PA_WIPE_CURSOR},
-    {"Fade", PA_FADE, PA_FADE},
-    {"Dissolve", PA_DISSOLVE, PA_DISSOLVE},
-    {"Blinds", PA_BLINDS, PA_BLINDS},
-    {"Random", PA_RANDOM, PA_RANDOM}
+// 8x32 Optimized Time Display Constants
+static const char* DAYS_SHORT[] = {
+    "SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"
 };
 
-#define ANIMATION_COUNT (sizeof(ANIMATION_EFFECTS) / sizeof(AnimationEffect))
-
-// Time Display Constants
-static const char* DAYS_OF_WEEK[] = {
-    "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"
+static const char* MONTHS_SHORT[] = {
+    "JAN", "FEB", "MAR", "APR", "MAY", "JUN",
+    "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"
 };
-
-static const char* MONTHS_OF_YEAR[] = {
-    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
-};
-
-#define DAYS_COUNT 7
-#define MONTHS_COUNT 12
 
 #endif // CONFIG_H

@@ -1,449 +1,404 @@
 #include "WebTemplates.h"
 #include "Config.h"
+#include "DisplayModeManager.h"
+#include "TimeManager.h"
 
-String WebTemplates::getCommonCSS() {
-    return R"rawliteral(
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            margin: 0;
-            padding: 20px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-        }
-        .container {
-            max-width: 700px;
-            margin: 0 auto;
-            background: white;
-            padding: 30px;
-            border-radius: 15px;
-            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
-        }
-        h1 {
-            color: #333;
-            text-align: center;
-            margin-bottom: 30px;
-            font-size: 2.2em;
-        }
-        .info {
-            background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
-            padding: 20px;
-            border-radius: 10px;
-            margin: 20px 0;
-            border-left: 4px solid #2196f3;
-        }
-        .form-section {
-            background: linear-gradient(135deg, #f3e5f5 0%, #e1bee7 100%);
-            padding: 25px;
-            border-radius: 10px;
-            margin: 20px 0;
-            border-left: 4px solid #9c27b0;
-        }
-        .advanced-section {
-            background: linear-gradient(135deg, #e8f5e8 0%, #c8e6c9 100%);
-            padding: 25px;
-            border-radius: 10px;
-            margin: 20px 0;
-            border-left: 4px solid #4caf50;
-        }
-        .status-online { color: #4caf50; font-weight: bold; }
-        .ip-address {
-            font-family: 'Courier New', monospace;
-            background: #f5f5f5;
-            padding: 5px 10px;
-            border-radius: 4px;
-            display: inline-block;
-        }
-        .message-input {
-            width: 100%;
-            padding: 12px 15px;
-            font-size: 16px;
-            border: 2px solid #ddd;
-            border-radius: 8px;
-            box-sizing: border-box;
-            margin-bottom: 15px;
-            transition: border-color 0.3s ease;
-        }
-        .message-input:focus {
-            outline: none;
-            border-color: #9c27b0;
-            box-shadow: 0 0 0 3px rgba(156, 39, 176, 0.1);
-        }
-        .control-group {
-            display: flex;
-            gap: 20px;
-            margin-bottom: 20px;
-            flex-wrap: wrap;
-        }
-        .control-item {
-            flex: 1;
-            min-width: 200px;
-        }
-        .control-label {
-            display: block;
-            margin-bottom: 8px;
-            font-weight: bold;
-            color: #333;
-        }
-        .range-input, .select-input {
-            width: 100%;
-            padding: 8px;
-            border: 2px solid #ddd;
-            border-radius: 6px;
-            font-size: 14px;
-        }
-        .range-input {
-            -webkit-appearance: none;
-            height: 8px;
-            background: #ddd;
-            outline: none;
-        }
-        .range-input::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            appearance: none;
-            width: 20px;
-            height: 20px;
-            background: #4caf50;
-            cursor: pointer;
-            border-radius: 50%;
-        }
-        .value-display {
-            background: #f5f5f5;
-            padding: 5px 10px;
-            border-radius: 4px;
-            font-family: monospace;
-            font-size: 14px;
-            display: inline-block;
-            margin-left: 10px;
-        }
-        .submit-btn {
-            background: linear-gradient(135deg, #4caf50 0%, #45a049 100%);
-            color: white;
-            padding: 15px 30px;
-            border: none;
-            border-radius: 8px;
-            font-size: 16px;
-            cursor: pointer;
-            transition: transform 0.2s ease;
-            margin-right: 15px;
-        }
-        .submit-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
-        }
-        .reset-btn {
-            background: #757575;
-            color: white;
-            padding: 15px 25px;
-            border: none;
-            border-radius: 8px;
-            font-size: 16px;
-            cursor: pointer;
-            transition: background 0.3s ease;
-        }
-        .reset-btn:hover {
-            background: #616161;
-        }
-        .current-settings {
-            background: #f5f5f5;
-            padding: 15px;
-            border-radius: 8px;
-            margin-top: 15px;
-            border-left: 4px solid #4caf50;
-        }
-        .preview-box {
-            background: #000;
-            color: #00ff00;
-            padding: 15px;
-            border-radius: 8px;
-            font-family: 'Courier New', monospace;
-            margin-top: 15px;
-            text-align: center;
-            font-size: 14px;
-            letter-spacing: 2px;
-            min-height: 40px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .char-counter {
-            text-align: right;
-            font-size: 12px;
-            color: #666;
-            margin-top: 5px;
-        }
-    )rawliteral";
+// Compressed shared CSS stored in PROGMEM - FIXED OVERFLOW ISSUES
+const char SHARED_CSS[] PROGMEM = R"(
+body{font-family:Arial;margin:0;padding:0;background:#667eea;min-height:100vh;overflow-x:hidden}
+.container{max-width:480px;margin:0 auto;background:white;min-height:100vh;overflow:hidden}
+.header{background:#4CAF50;color:white;padding:12px;text-align:center}
+.header h1{margin:0;font-size:1.3em;word-wrap:break-word}
+.nav{background:#f5f5f5;display:flex;overflow-x:auto;flex-wrap:wrap}
+.nav a{flex:1;padding:8px 4px;text-decoration:none;color:#333;border-bottom:2px solid transparent;white-space:nowrap;text-align:center;min-width:70px;font-size:12px}
+.nav a:hover{background:#e8e8e8}
+.nav a.active{border-bottom-color:#4CAF50;background:white;color:#4CAF50}
+.content{padding:12px;overflow-y:auto;max-height:calc(100vh - 160px)}
+.form-group{margin:12px 0}
+.form-group label{display:block;margin-bottom:5px;font-weight:bold;font-size:14px}
+.form-group input,.form-group select{width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;box-sizing:border-box}
+.btn{background:#4CAF50;color:white;padding:10px 15px;border:none;border-radius:4px;cursor:pointer;margin:5px 0;width:100%;font-size:14px}
+.btn:hover{background:#45a049}
+.btn-orange{background:#FF9800}
+.btn-orange:hover{background:#F57C00}
+.info{background:#e3f2fd;padding:8px;border-radius:4px;margin:8px 0;font-size:12px;word-wrap:break-word}
+.preview{background:#000;color:#0f0;padding:8px;font-family:monospace;text-align:center;border-radius:4px;margin:8px 0;font-size:14px;overflow:hidden}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0}
+.radio-group{margin:8px 0}
+.radio-item{display:flex;align-items:center;background:#f8f9fa;padding:6px;border-radius:4px;margin:4px 0;border:1px solid #ddd;font-size:13px}
+.radio-item input{margin-right:6px}
+.status{background:#f8f9fa;padding:8px;border-radius:4px;margin:8px 0;border-left:3px solid #4CAF50;font-size:13px;word-wrap:break-word}
+@media(max-width:500px){.grid{grid-template-columns:1fr}.nav{flex-wrap:wrap}.nav a{min-width:60px;font-size:11px}.container{max-width:100%}}
+)";
+
+String WebTemplates::getSharedCSS() {
+    return String(FPSTR(SHARED_CSS));
 }
 
-String WebTemplates::getSystemInfoSection() {
-    return R"rawliteral(
-        <div class="info">
-            <h3>🔧 System Information</h3>
-            <p><strong>Status:</strong> <span class="status-online">Web Server Running</span></p>
-            <p><strong>Network:</strong> <span class="status-online">Connected</span></p>
-            <p><strong>Display:</strong> MAX7219 8x32 LED Matrix</p>
-            <p><strong>Controller:</strong> ESP8266 (Wemos D1)</p>
-            <p><strong>Uptime:</strong> <span id="uptime">Loading...</span></p>
-        </div>
-    )rawliteral";
+String WebTemplates::getNavigation(const String& currentPage) {
+    String nav = F("<div class=\"nav\">");
+    nav += F("<a href=\"/\" class=\"");
+    nav += (currentPage == "dashboard") ? F("active") : F("");
+    nav += F("\">🏠 Home</a>");
+    nav += F("<a href=\"/control\" class=\"");
+    nav += (currentPage == "control") ? F("active") : F("");
+    nav += F("\">💬 Control</a>");
+    nav += F("<a href=\"/modes\" class=\"");
+    nav += (currentPage == "modes") ? F("active") : F("");
+    nav += F("\">🎯 Modes</a>");
+    nav += F("<a href=\"/advanced\" class=\"");
+    nav += (currentPage == "advanced") ? F("active") : F("");
+    nav += F("\">⚙️ Advanced</a>");
+    nav += F("<a href=\"/status\" class=\"");
+    nav += (currentPage == "status") ? F("active") : F("");
+    nav += F("\">📊 Status</a>");
+    nav += F("</div>");
+    return nav;
 }
 
-String WebTemplates::getAnimationOptionsHTML(int selectedIndex) {
-    String options = "";
-    for (int i = 0; i < ANIMATION_COUNT; i++) {
-        String selected = (i == selectedIndex) ? " selected" : "";
-        options += "<option value=\"" + String(i) + "\"" + selected + ">" +
-                   String(ANIMATION_EFFECTS[i].name) + "</option>";
+String WebTemplates::getCurrentModeString(int mode) {
+    switch (mode) {
+        case MODE_MANUAL: return F("Message");
+        case MODE_CLOCK: return F("Clock");
+        case MODE_DAY: return F("Day");
+        case MODE_DATE: return F("Date");
+        case MODE_SCROLL: return F("Scroll");
+        case MODE_AUTO_CYCLE: return F("Auto Cycle");
+        default: return F("Unknown");
     }
-    return options;
 }
 
-String WebTemplates::getAdvancedControlsSection(const DisplaySettings& settings) {
-    String controlsSection = R"rawliteral(
-        <div class="advanced-section">
-            <h3>⚙️ Advanced Display Controls</h3>
-
-            <form method="POST" action="/update" id="displayForm">
-                <!-- Message Input -->
-                <div style="margin-bottom: 20px;">
-                    <label class="control-label" for="messageInput">💬 Message Text</label>
-                    <input type="text"
-                           name="message"
-                           id="messageInput"
-                           class="message-input"
-                           placeholder="Enter your message here..."
-                           value="%MESSAGE%"
-                           maxlength="100"
-                           autocomplete="off">
-                    <div class="char-counter">
-                        <span id="charCount">0</span>/100 characters
-                    </div>
-                </div>
-
-                <!-- Advanced Controls -->
-                <div class="control-group">
-                    <div class="control-item">
-                        <label class="control-label" for="brightness">💡 Brightness</label>
-                        <input type="range"
-                               name="brightness"
-                               id="brightness"
-                               class="range-input"
-                               min="0" max="15"
-                               value="%BRIGHTNESS%">
-                        <span class="value-display"><span id="brightnessValue">%BRIGHTNESS%</span>/15</span>
-                    </div>
-
-                    <div class="control-item">
-                        <label class="control-label" for="speed">⚡ Animation Speed</label>
-                        <input type="range"
-                               name="speed"
-                               id="speed"
-                               class="range-input"
-                               min="20" max="200"
-                               value="%SPEED%">
-                        <span class="value-display"><span id="speedValue">%SPEED%</span>ms</span>
-                    </div>
-                </div>
-
-                <div class="control-group">
-                    <div class="control-item">
-                        <label class="control-label" for="animation">🎭 Animation Effect</label>
-                        <select name="animation" id="animation" class="select-input">
-                            %ANIMATION_OPTIONS%
-                        </select>
-                    </div>
-                </div>
-
-                <!-- Buttons -->
-                <div style="margin-top: 25px;">
-                    <button type="submit" class="submit-btn">🚀 Update Display</button>
-                    <button type="button" class="reset-btn" onclick="resetToDefaults()">🔄 Reset Defaults</button>
-                </div>
-            </form>
-
-            <!-- Current Settings Display -->
-            <div class="current-settings">
-                <h4>📊 Current Settings</h4>
-                <p><strong>Message:</strong> "<span id="currentMsg">%MESSAGE%</span>"</p>
-                <p><strong>Brightness:</strong> <span id="currentBrightness">%BRIGHTNESS%</span>/15</p>
-                <p><strong>Speed:</strong> <span id="currentSpeed">%SPEED%</span>ms</p>
-                <p><strong>Animation:</strong> <span id="currentAnimation">%ANIMATION_NAME%</span></p>
-            </div>
-
-            <!-- Live Preview -->
-            <div class="preview-box" id="previewBox">%MESSAGE%</div>
-        </div>
-    )rawliteral";
-
-    // Replace placeholders
-    controlsSection.replace("%MESSAGE%", settings.message);
-    controlsSection.replace("%BRIGHTNESS%", String(settings.brightness));
-    controlsSection.replace("%SPEED%", String(settings.speed));
-    controlsSection.replace("%ANIMATION_OPTIONS%", getAnimationOptionsHTML(settings.animationIndex));
-    controlsSection.replace("%ANIMATION_NAME%", String(ANIMATION_EFFECTS[settings.animationIndex].name));
-
-    return controlsSection;
+// FIXED DASHBOARD - NO MORE OVERFLOW
+String WebTemplates::getDashboardPage(const String& networkSSID, const String& ipAddress, const DisplaySettings& settings) {
+    String html = F("<!DOCTYPE html><html><head>");
+    html += F("<meta charset=\"UTF-8\">");
+    html += F("<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">");
+    html += F("<title>WiMatrix Dashboard</title>");
+    html += F("<style>");
+    html += getSharedCSS();
+    html += F("</style>");
+    html += F("</head><body>");
+    html += F("<div class=\"container\">");
+    html += F("<div class=\"header\">");
+    html += F("<h1>🚀 WiMatrix Controller</h1>");
+    html += F("<div style=\"font-size:12px\">📡 ");
+    html += networkSSID;
+    html += F(" | 🔗 ");
+    html += ipAddress;
+    html += F("</div>");
+    html += F("</div>");
+    html += getNavigation("dashboard");
+    html += F("<div class=\"content\">");
+    html += F("<div class=\"status\">");
+    html += F("<strong>Current Status:</strong><br>");
+    html += F("Mode: ");
+    html += getCurrentModeString(settings.mode);
+    html += F("<br>Message: \"");
+    html += settings.message;
+    html += F("\"<br>Time: <span id=\"time\">");
+    html += TimeManager::getTimeString();
+    html += F("</span><br>Uptime: <span id=\"uptime\">0</span>s");
+    html += F("</div>");
+    html += F("<div class=\"info\">");
+    html += F("<strong>📏 Quick Guide:</strong><br>");
+    html += F("• Control: Message & display settings<br>");
+    html += F("• Modes: Auto-cycle behavior<br>");
+    html += F("• Advanced: Quick actions<br>");
+    html += F("• Status: System monitoring");
+    html += F("</div>");
+    html += F("<div class=\"grid\">");
+    html += F("<a href=\"/control\" class=\"btn\">💬 Control</a>");
+    html += F("<a href=\"/modes\" class=\"btn\">🎯 Modes</a>");
+    html += F("<a href=\"/advanced\" class=\"btn btn-orange\">⚙️ Advanced</a>");
+    html += F("<a href=\"/status\" class=\"btn btn-orange\">📊 Status</a>");
+    html += F("</div></div></div>");
+    html += F("<script>");
+    html += F("function updateStatus(){");
+    html += F("fetch('/api/uptime').then(r=>r.text()).then(d=>document.getElementById('uptime').textContent=d);");
+    html += F("fetch('/api/current-time').then(r=>r.text()).then(d=>document.getElementById('time').textContent=d)");
+    html += F("}");
+    html += F("setInterval(updateStatus,2000);updateStatus()");
+    html += F("</script>");
+    html += F("</body></html>");
+    return html;
 }
 
-String WebTemplates::getMainPage(const String& networkSSID, const String& ipAddress, const DisplaySettings& settings) {
-    String html = R"rawliteral(
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WiMatrix Advanced Controller</title>
-    <style>
-    )rawliteral";
+String WebTemplates::getControlPage(const DisplaySettings& settings) {
+    String html = F("<!DOCTYPE html><html><head>");
+    html += F("<meta charset=\"UTF-8\">");
+    html += F("<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">");
+    html += F("<title>Message Control</title>");
+    html += F("<style>");
+    html += getSharedCSS();
+    html += F("</style>");
+    html += F("</head><body>");
+    html += F("<div class=\"container\">");
+    html += F("<div class=\"header\"><h1>💬 Message Control</h1></div>");
+    html += getNavigation("control");
+    html += F("<div class=\"content\">");
+    html += F("<div class=\"info\">");
+    html += F("<strong>📏 8x32 Display Guide:</strong> 1-5 chars = static, 6+ chars = scroll");
+    html += F("</div>");
+    html += F("<form method=\"POST\" action=\"/update\">");
+    html += F("<input type=\"hidden\" name=\"page\" value=\"control\">");
+    html += F("<div class=\"form-group\">");
+    html += F("<label>Custom Message:</label>");
+    html += F("<input type=\"text\" name=\"message\" value=\"");
+    html += settings.message;
+    html += F("\" maxlength=\"50\" placeholder=\"Enter your message...\">");
+    html += F("<div class=\"preview\">");
+    html += settings.message;
+    html += F("</div>");
+    html += F("</div>");
+    html += F("<div class=\"grid\">");
+    html += F("<div class=\"form-group\">");
+    html += F("<label>💡 Brightness: <span id=\"bval\">");
+    html += String(settings.brightness);
+    html += F("</span>/8</label>");
+    html += F("<input type=\"range\" name=\"brightness\" min=\"0\" max=\"8\" value=\"");
+    html += String(settings.brightness);
+    html += F("\" oninput=\"document.getElementById('bval').textContent=this.value\">");
+    html += F("</div>");
+    html += F("<div class=\"form-group\">");
+    html += F("<label>⚡ Speed: <span id=\"sval\">");
+    html += String(settings.speed);
+    html += F("</span>ms</label>");
+    html += F("<input type=\"range\" name=\"speed\" min=\"40\" max=\"150\" value=\"");
+    html += String(settings.speed);
+    html += F("\" oninput=\"document.getElementById('sval').textContent=this.value\">");
+    html += F("</div>");
+    html += F("</div>");
+    html += F("<button type=\"submit\" class=\"btn\">🚀 Apply Settings</button>");
+    html += F("</form>");
+    html += F("</div></div></body></html>");
+    return html;
+}
 
-    html += getCommonCSS();
+// FIXED MODES PAGE - REMOVED DATE FORMAT SELECTION
+String WebTemplates::getModesPage(const DisplaySettings& settings) {
+    String html = F("<!DOCTYPE html><html><head>");
+    html += F("<meta charset=\"UTF-8\">");
+    html += F("<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">");
+    html += F("<title>Display Modes</title>");
+    html += F("<style>");
+    html += getSharedCSS();
+    html += F("</style>");
+    html += F("</head><body>");
+    html += F("<div class=\"container\">");
+    html += F("<div class=\"header\"><h1>🎯 Display Modes</h1></div>");
+    html += getNavigation("modes");
+    html += F("<div class=\"content\">");
+    html += F("<form method=\"POST\" action=\"/update\">");
+    html += F("<input type=\"hidden\" name=\"page\" value=\"modes\">");
+    html += F("<div class=\"form-group\">");
+    html += F("<label>🎮 Display Behavior:</label>");
+    html += F("<div class=\"radio-group\">");
 
-    html += R"rawliteral(
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>🚀 WiMatrix LED Controller</h1>
+    // ALL MODE OPTIONS INCLUDING DAY AND DATE
+    html += F("<label class=\"radio-item\">");
+    html += F("<input type=\"radio\" name=\"displayMode\" value=\"message\"");
+    html += (settings.mode == MODE_MANUAL) ? F(" checked") : F("");
+    html += F("> 📜 Message Only");
+    html += F("</label>");
 
-        <div class="info">
-            <h3>🌐 Network Information</h3>
-            <p><strong>Connected to:</strong> %NETWORK_SSID%</p>
-            <p><strong>IP Address:</strong> <span class="ip-address">%IP_ADDRESS%</span></p>
-            <p><strong>Access URL:</strong> <code>http://%IP_ADDRESS%</code></p>
-        </div>
+    html += F("<label class=\"radio-item\">");
+    html += F("<input type=\"radio\" name=\"displayMode\" value=\"clock\"");
+    html += (settings.mode == MODE_CLOCK) ? F(" checked") : F("");
+    html += F("> 🕐 Clock Only");
+    html += F("</label>");
 
-    )rawliteral";
+    html += F("<label class=\"radio-item\">");
+    html += F("<input type=\"radio\" name=\"displayMode\" value=\"day\"");
+    html += (settings.mode == MODE_DAY) ? F(" checked") : F("");
+    html += F("> 📅 Day Only");
+    html += F("</label>");
 
-    html += getSystemInfoSection();
-    html += getAdvancedControlsSection(settings);
+    html += F("<label class=\"radio-item\">");
+    html += F("<input type=\"radio\" name=\"displayMode\" value=\"date\"");
+    html += (settings.mode == MODE_DATE) ? F(" checked") : F("");
+    html += F("> 📆 Date Only (20 JAN)");
+    html += F("</label>");
 
-    html += R"rawliteral(
+    html += F("<label class=\"radio-item\">");
+    html += F("<input type=\"radio\" name=\"displayMode\" value=\"auto\"");
+    html += (settings.mode == MODE_AUTO_CYCLE) ? F(" checked") : F("");
+    html += F("> 🔄 Auto Cycle");
+    html += F("</label>");
 
-        <div style="text-align: center; margin-top: 30px; color: #666;">
-            <small>WiMatrix v2.0 | Advanced LED Matrix Controller</small>
-        </div>
-    </div>
+    html += F("</div></div>");
 
-    <script>
-        // Update uptime every second
-        function updateUptime() {
-            fetch('/api/uptime')
-                .then(response => response.text())
-                .then(data => {
-                    document.getElementById('uptime').textContent = data + 's';
-                })
-                .catch(err => console.log('Uptime fetch failed:', err));
-        }
+    // AUTO CYCLE OPTIONS (REMOVED DATE FORMAT SECTION)
+    html += F("<div id=\"autoOptions\" style=\"display:");
+    html += (settings.mode == MODE_AUTO_CYCLE) ? F("block") : F("none");
+    html += F("\">");
+    html += F("<div class=\"form-group\">");
+    html += F("<label>⏱️ Switch Every: <span id=\"ival\">");
+    html += String(settings.modeSettings.cycleInterval);
+    html += F("</span>s</label>");
+    html += F("<input type=\"range\" name=\"cycleInterval\" min=\"2\" max=\"10\" value=\"");
+    html += String(settings.modeSettings.cycleInterval);
+    html += F("\" oninput=\"document.getElementById('ival').textContent=this.value\">");
+    html += F("</div>");
+    html += F("<div class=\"form-group\">");
+    html += F("<label>📋 Include These Modes:</label>");
+    html += F("<label class=\"radio-item\">");
+    html += F("<input type=\"checkbox\" name=\"enableClock\"");
+    html += (settings.modeSettings.clockEnabled) ? F(" checked") : F("");
+    html += F("> 🕐 Clock (HH:MM)");
+    html += F("</label>");
+    html += F("<label class=\"radio-item\">");
+    html += F("<input type=\"checkbox\" name=\"enableDay\"");
+    html += (settings.modeSettings.dayEnabled) ? F(" checked") : F("");
+    html += F("> 📅 Day (SUN/MON)");
+    html += F("</label>");
+    html += F("<label class=\"radio-item\">");
+    html += F("<input type=\"checkbox\" name=\"enableDate\"");
+    html += (settings.modeSettings.dateEnabled) ? F(" checked") : F("");
+    html += F("> 📆 Date (20 JAN)");
+    html += F("</label>");
+    html += F("<label class=\"radio-item\">");
+    html += F("<input type=\"checkbox\" name=\"enableMessage\"");
+    html += (settings.modeSettings.messageEnabled) ? F(" checked") : F("");
+    html += F("> 💬 Custom Message");
+    html += F("</label>");
+    html += F("</div></div>");
+    html += F("<button type=\"submit\" class=\"btn\">💾 Save Mode Settings</button>");
+    html += F("</form>");
+    html += F("<div class=\"status\">");
+    html += F("<strong>Current:</strong> ");
+    html += getCurrentModeString(settings.mode);
+    html += F(" | Time: <span id=\"time\">");
+    html += TimeManager::getTimeString();
+    html += F("</span>");
+    html += F("</div>");
+    html += F("</div></div>");
+    html += F("<script>");
+    html += F("document.querySelectorAll('input[name=\"displayMode\"]').forEach(r=>r.onchange=()=>document.getElementById('autoOptions').style.display=document.querySelector('input[value=\"auto\"]:checked')?'block':'none');");
+    html += F("function updateTime(){fetch('/api/current-time').then(r=>r.text()).then(d=>document.getElementById('time').textContent=d)}");
+    html += F("setInterval(updateTime,5000);updateTime()");
+    html += F("</script>");
+    html += F("</body></html>");
+    return html;
+}
 
-        // Update character counter and preview
-        function updateCharCounter() {
-            const input = document.getElementById('messageInput');
-            const counter = document.getElementById('charCount');
-            const preview = document.getElementById('previewBox');
+String WebTemplates::getAdvancedPage(const DisplaySettings& settings) {
+    String html = F("<!DOCTYPE html><html><head>");
+    html += F("<meta charset=\"UTF-8\">");
+    html += F("<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">");
+    html += F("<title>Advanced Settings</title>");
+    html += F("<style>");
+    html += getSharedCSS();
+    html += F("</style>");
+    html += F("</head><body>");
+    html += F("<div class=\"container\">");
+    html += F("<div class=\"header\"><h1>⚙️ Advanced Settings</h1></div>");
+    html += getNavigation("advanced");
+    html += F("<div class=\"content\">");
+    html += F("<div class=\"form-group\">");
+    html += F("<label>🎯 Quick Actions:</label>");
+    html += F("<button class=\"btn btn-orange\" onclick=\"quickAction('next')\">⏭️ Next Mode</button>");
+    html += F("<button class=\"btn btn-orange\" onclick=\"quickAction('pause')\">⏸️ Pause/Resume</button>");
+    html += F("<button class=\"btn btn-orange\" onclick=\"resetDefaults()\">🔄 Reset Defaults</button>");
+    html += F("</div>");
+    html += F("<div class=\"info\">");
+    html += F("<strong>💡 8x32 Display Tips:</strong><br>");
+    html += F("• Use shorter messages for better readability<br>");
+    html += F("• Slower scroll speeds improve readability<br>");
+    html += F("• Lower brightness saves power<br>");
+    html += F("• Auto cycle shows different info throughout day<br>");
+    html += F("• Date format is fixed to '20 JAN' for optimal display");
+    html += F("</div>");
+    html += F("</div></div>");
+    html += F("<script>");
+    html += F("function quickAction(action){");
+    html += F("const url=action==='next'?'/api/next-mode':'/api/pause-mode';");
+    html += F("fetch(url,{method:'POST'}).then(()=>setTimeout(()=>location.href='/',1000))");
+    html += F("}");
+    html += F("function resetDefaults(){");
+    html += F("if(confirm('Reset all settings?')){");
+    html += F("fetch('/api/reset',{method:'POST'}).then(()=>location.href='/')");
+    html += F("}");
+    html += F("}");
+    html += F("</script>");
+    html += F("</body></html>");
+    return html;
+}
 
-            counter.textContent = input.value.length;
-            preview.textContent = input.value || 'Preview will appear here...';
-
-            // Color coding for character count
-            if (input.value.length > 80) {
-                counter.style.color = '#f44336';
-            } else if (input.value.length > 60) {
-                counter.style.color = '#ff9800';
-            } else {
-                counter.style.color = '#4caf50';
-            }
-        }
-
-        // Update brightness value display
-        function updateBrightnessDisplay() {
-            const slider = document.getElementById('brightness');
-            const display = document.getElementById('brightnessValue');
-            display.textContent = slider.value;
-        }
-
-        // Update speed value display
-        function updateSpeedDisplay() {
-            const slider = document.getElementById('speed');
-            const display = document.getElementById('speedValue');
-            display.textContent = slider.value;
-        }
-
-        // Reset to default values
-        function resetToDefaults() {
-            document.getElementById('messageInput').value = 'Welcome to WiMatrix!';
-            document.getElementById('brightness').value = '5';
-            document.getElementById('speed').value = '60';
-            document.getElementById('animation').value = '0';
-
-            updateCharCounter();
-            updateBrightnessDisplay();
-            updateSpeedDisplay();
-        }
-
-        // Initialize event listeners
-        document.getElementById('messageInput').addEventListener('input', updateCharCounter);
-        document.getElementById('brightness').addEventListener('input', updateBrightnessDisplay);
-        document.getElementById('speed').addEventListener('input', updateSpeedDisplay);
-
-        // Initialize displays
-        setInterval(updateUptime, 1000);
-        updateUptime();
-        updateCharCounter();
-        updateBrightnessDisplay();
-        updateSpeedDisplay();
-    </script>
-</body>
-</html>
-    )rawliteral";
-
-    // Replace placeholders
-    html.replace("%NETWORK_SSID%", networkSSID);
-    html.replace("%IP_ADDRESS%", ipAddress);
-
+String WebTemplates::getStatusPage(const String& networkSSID, const String& ipAddress, const DisplaySettings& settings) {
+    String html = F("<!DOCTYPE html><html><head>");
+    html += F("<meta charset=\"UTF-8\">");
+    html += F("<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">");
+    html += F("<title>System Status</title>");
+    html += F("<style>");
+    html += getSharedCSS();
+    html += F("</style>");
+    html += F("</head><body>");
+    html += F("<div class=\"container\">");
+    html += F("<div class=\"header\"><h1>📊 System Status</h1></div>");
+    html += getNavigation("status");
+    html += F("<div class=\"content\">");
+    html += F("<div class=\"status\">");
+    html += F("<strong>📊 Current Settings:</strong><br>");
+    html += F("Message: \"");
+    html += settings.message;
+    html += F("\"<br>Mode: ");
+    html += getCurrentModeString(settings.mode);
+    html += F("<br>Brightness: ");
+    html += String(settings.brightness);
+    html += F("/8<br>Speed: ");
+    html += String(settings.speed);
+    html += F("ms<br>Cycle Interval: ");
+    html += String(settings.modeSettings.cycleInterval);
+    html += F("s");
+    html += F("</div>");
+    html += F("<div class=\"status\">");
+    html += F("<strong>🔧 System Information:</strong><br>");
+    html += F("Free Memory: <span id=\"memory\">Loading...</span><br>");
+    html += F("WiFi Signal: <span id=\"signal\">Loading...</span><br>");
+    html += F("Controller: ESP8266 (Wemos D1)<br>");
+    html += F("Display: MAX7219 8x32 LED Matrix<br>");
+    html += F("Firmware: WiMatrix v2.0<br>");
+    html += F("Date Format: Fixed to '20 JAN'");
+    html += F("</div>");
+    html += F("<div class=\"status\">");
+    html += F("<strong>🌐 Network Details:</strong><br>");
+    html += F("SSID: ");
+    html += networkSSID;
+    html += F("<br>IP Address: ");
+    html += ipAddress;
+    html += F("<br>MAC Address: <span id=\"mac\">Loading...</span><br>");
+    html += F("Uptime: <span id=\"uptime\">Loading...</span>");
+    html += F("</div>");
+    html += F("</div></div>");
+    html += F("<script>");
+    html += F("function updateStatus(){");
+    html += F("fetch('/api/settings').then(r=>r.json()).then(d=>{");
+    html += F("if(d.freeHeap)document.getElementById('memory').textContent=d.freeHeap+' bytes';");
+    html += F("if(d.rssi)document.getElementById('signal').textContent=d.rssi+' dBm';");
+    html += F("if(d.macAddress)document.getElementById('mac').textContent=d.macAddress");
+    html += F("});");
+    html += F("fetch('/api/uptime').then(r=>r.text()).then(d=>{");
+    html += F("const h=Math.floor(d/3600);");
+    html += F("const m=Math.floor((d%3600)/60);");
+    html += F("document.getElementById('uptime').textContent=h+'h '+m+'m '+(d%60)+'s'");
+    html += F("})");
+    html += F("}");
+    html += F("setInterval(updateStatus,3000);updateStatus()");
+    html += F("</script>");
+    html += F("</body></html>");
     return html;
 }
 
 String WebTemplates::get404Page(const String& uri, const String& method, int args) {
-    // Keep existing 404 page implementation
-    String html = R"rawliteral(
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>404 - Page Not Found</title>
-    <style>
-    )rawliteral";
-
-    html += getCommonCSS();
-
-    html += R"rawliteral(
-        .error { background: #ffebee; border-left: 4px solid #f44336; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>❌ 404 - Page Not Found</h1>
-
-        <div class="info error">
-            <h3>Request Details</h3>
-            <p><strong>URI:</strong> %URI%</p>
-            <p><strong>Method:</strong> %METHOD%</p>
-            <p><strong>Arguments:</strong> %ARGS%</p>
-        </div>
-
-        <div style="text-align: center; margin-top: 30px;">
-            <a href="/" style="background: #2196f3; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">
-                🏠 Go Home
-            </a>
-        </div>
-    </div>
-</body>
-</html>
-    )rawliteral";
-
-    html.replace("%URI%", uri);
-    html.replace("%METHOD%", method);
-    html.replace("%ARGS%", String(args));
-
+    String html = F("<!DOCTYPE html><html><head>");
+    html += F("<title>404 Not Found</title>");
+    html += F("<style>body{font-family:Arial;text-align:center;margin:50px}</style>");
+    html += F("</head><body>");
+    html += F("<h1>404 - Page Not Found</h1>");
+    html += F("<p>");
+    html += uri;
+    html += F("</p>");
+    html += F("<a href=\"/\" style=\"background:#4CAF50;color:white;padding:10px 20px;text-decoration:none;border-radius:4px\">🏠 Return Home</a>");
+    html += F("</body></html>");
     return html;
 }

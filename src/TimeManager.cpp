@@ -1,6 +1,3 @@
-//
-// Created by Tikaram Mardi on 20/07/25.
-//
 #include "TimeManager.h"
 #include "Logger.h"
 
@@ -42,33 +39,37 @@ bool TimeManager::isTimeSet() {
 }
 
 String TimeManager::getTimeString() {
-    if (!isTimeSet()) return "No Time";
+    if (!isTimeSet()) return "??:??";
 
-    char timeStr[10];
+    // Always use 24-hour format for 8x32 display (5 chars: "23:45")
+    char timeStr[6];
     snprintf(timeStr, sizeof(timeStr), "%02d:%02d", hour(), minute());
     return String(timeStr);
 }
 
+// FIXED: Always returns "20 JAN" format
 String TimeManager::getDateString() {
-    if (!isTimeSet()) return "No Date";
+    if (!isTimeSet()) return "???";
 
-    char dateStr[12];
-    snprintf(dateStr, sizeof(dateStr), "%02d %s", day(), MONTHS_OF_YEAR[month() - 1]);
+    // Use "20 JAN" format for 8x32 display (6 chars)
+    char dateStr[7];
+    snprintf(dateStr, sizeof(dateStr), "%02d %s", day(), MONTHS_SHORT[month() - 1]);
     return String(dateStr);
 }
 
 String TimeManager::getDayString() {
-    if (!isTimeSet()) return "No Day";
-    return String(DAYS_OF_WEEK[weekday() - 1]);
+    if (!isTimeSet()) return "???";
+    // Use 3-character day names for 8x32
+    return String(DAYS_SHORT[weekday() - 1]);
 }
 
 String TimeManager::getFullDateTime() {
     if (!isTimeSet()) return "Time not set";
 
-    char fullDateTime[30];
-    snprintf(fullDateTime, sizeof(fullDateTime), "%s %02d %s %04d %02d:%02d:%02d",
-             DAYS_OF_WEEK[weekday() - 1], day(), MONTHS_OF_YEAR[month() - 1],
-             year(), hour(), minute(), second());
+    // Compact format for logging
+    char fullDateTime[20];
+    snprintf(fullDateTime, sizeof(fullDateTime), "%s %02d/%02d %02d:%02d",
+             DAYS_SHORT[weekday() - 1], day(), month(), hour(), minute());
     return String(fullDateTime);
 }
 

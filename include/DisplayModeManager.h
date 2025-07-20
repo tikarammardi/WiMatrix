@@ -1,7 +1,3 @@
-//
-// Created by Tikaram Mardi on 20/07/25.
-//
-
 #ifndef DISPLAY_MODE_MANAGER_H
 #define DISPLAY_MODE_MANAGER_H
 
@@ -13,9 +9,9 @@ struct DisplaySettings {
     String message;
     int brightness;
     int speed;
-    int animationIndex;
     DisplayMode mode;
     bool autoCycleEnabled;
+    ModeSettings modeSettings;
 };
 
 class DisplayModeManager {
@@ -30,6 +26,7 @@ private:
 
     static void initializeScrollText();
     static void displayCurrentMode();
+    static DisplayMode getNextEnabledMode();
 
 public:
     static void init(MD_Parola* displayInstance);
@@ -55,4 +52,3 @@ public:
 };
 
 #endif // DISPLAY_MODE_MANAGER_H
-

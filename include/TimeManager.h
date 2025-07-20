@@ -1,7 +1,3 @@
-//
-// Created by Tikaram Mardi on 20/07/25.
-//
-
 #ifndef TIME_MANAGER_H
 #define TIME_MANAGER_H
 
@@ -24,7 +20,7 @@ public:
 
     // Time formatting functions
     static String getTimeString();
-    static String getDateString();
+    static String getDateString(); // Always returns "20 JAN" format
     static String getDayString();
     static String getFullDateTime();
 

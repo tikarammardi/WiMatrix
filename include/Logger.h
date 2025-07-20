@@ -36,4 +36,3 @@ public:
 };
 
 #endif // LOGGER_H
-

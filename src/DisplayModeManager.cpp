@@ -5,14 +5,15 @@
 #include "TimeManager.h"
 #include "Logger.h"
 
+// Static member initialization
 MD_Parola* DisplayModeManager::display = nullptr;
 DisplaySettings DisplayModeManager::currentSettings = {
-    "Cotton Cat!!",      // message
-    DEFAULT_BRIGHTNESS,  // brightness
-    DEFAULT_SCROLL_SPEED,// speed
-    0,                   // animationIndex
-    MODE_AUTO_CYCLE,     // mode
-    true                 // autoCycleEnabled
+    "Cotton Cat!!",                       // message
+    DEFAULT_BRIGHTNESS,          // brightness
+    DEFAULT_SCROLL_SPEED,        // speed
+    MODE_AUTO_CYCLE,            // mode
+    true,                       // autoCycleEnabled
+    {true, true, true, true, 3} // modeSettings (all enabled, 3s interval)
 };
 
 unsigned long DisplayModeManager::lastModeSwitch = 0;
@@ -22,10 +23,63 @@ int DisplayModeManager::currentCycleIndex = 0;
 
 // Define the cycle order for auto mode
 DisplayMode DisplayModeManager::cycleModes[] = {
-    MODE_CLOCK, MODE_DAY, MODE_DATE, MODE_SCROLL
+    MODE_CLOCK, MODE_DAY, MODE_DATE, MODE_MANUAL
 };
 
+DisplayMode DisplayModeManager::getNextEnabledMode() {
+    int attempts = 0;
+    int startIndex = currentCycleIndex;
+
+    while (attempts < 4) { // Max 4 attempts to avoid infinite loop
+        currentCycleIndex = (currentCycleIndex + 1) % 4;
+
+        DisplayMode nextMode = cycleModes[currentCycleIndex];
+
+        // Check if this mode is enabled
+        bool isEnabled = false;
+        switch (nextMode) {
+            case MODE_CLOCK:
+                isEnabled = currentSettings.modeSettings.clockEnabled;
+                break;
+            case MODE_DAY:
+                isEnabled = currentSettings.modeSettings.dayEnabled;
+                break;
+            case MODE_DATE:
+                isEnabled = currentSettings.modeSettings.dateEnabled;
+                break;
+            case MODE_MANUAL:
+                isEnabled = currentSettings.modeSettings.messageEnabled;
+                break;
+            default:
+                isEnabled = false;
+                break;
+        }
+
+        if (isEnabled) {
+            Logger::info("Next enabled mode: " + String(nextMode) + " (index " + String(currentCycleIndex) + ")", "DISPLAY");
+            return nextMode;
+        }
+
+        attempts++;
+
+        // If we've cycled back to start and found nothing, break
+        if (currentCycleIndex == startIndex && attempts > 0) {
+            break;
+        }
+    }
+
+    // Fallback: enable clock mode if nothing else is enabled
+    currentSettings.modeSettings.clockEnabled = true;
+    Logger::warn("No modes enabled! Falling back to clock mode", "DISPLAY");
+    return MODE_CLOCK;
+}
+
 void DisplayModeManager::init(MD_Parola* displayInstance) {
+    if (!displayInstance) {
+        Logger::error("Display instance is null!", "DISPLAY");
+        return;
+    }
+
     display = displayInstance;
     display->begin();
     display->setIntensity(currentSettings.brightness);
@@ -34,36 +88,42 @@ void DisplayModeManager::init(MD_Parola* displayInstance) {
 
     lastModeSwitch = millis();
     lastDisplayUpdate = millis();
+    isScrollInitialized = false;
+    currentCycleIndex = 0;
 
-    Logger::info("Display Mode Manager initialized", "DISPLAY");
+    Logger::info("Display Mode Manager initialized with individual mode controls", "DISPLAY");
     Logger::info("Current mode: " + getCurrentModeString(), "DISPLAY");
+    Logger::info("Mode settings - Clock:" + String(currentSettings.modeSettings.clockEnabled ? "ON" : "OFF") +
+                " Day:" + String(currentSettings.modeSettings.dayEnabled ? "ON" : "OFF") +
+                " Date:" + String(currentSettings.modeSettings.dateEnabled ? "ON" : "OFF") +
+                " Message:" + String(currentSettings.modeSettings.messageEnabled ? "ON" : "OFF"), "DISPLAY");
 }
 
 void DisplayModeManager::update() {
-    if (!display) return;
+    if (!display) {
+        Logger::error("Display not initialized!", "DISPLAY");
+        return;
+    }
 
-    // Handle auto cycle mode
+    // Handle auto cycle mode with custom interval
     if (currentSettings.mode == MODE_AUTO_CYCLE && currentSettings.autoCycleEnabled) {
-        if (millis() - lastModeSwitch >= MODE_SWITCH_INTERVAL) {
-            // Handle scroll text completion
-            if (cycleModes[currentCycleIndex] == MODE_SCROLL) {
-                if (display->displayAnimate()) {
-                    // Scroll completed, move to next mode
-                    nextMode();
-                }
-            } else {
-                // Non-scroll modes, switch after interval
-                nextMode();
-            }
+        unsigned long interval = currentSettings.modeSettings.cycleInterval * 1000; // Convert to milliseconds
+
+        if (millis() - lastModeSwitch >= interval) {
+            nextMode();
         }
     }
 
     // Update display based on current mode
     displayCurrentMode();
 
-    // Animate scroll text if in scroll mode
-    if ((currentSettings.mode == MODE_SCROLL) ||
-        (currentSettings.mode == MODE_AUTO_CYCLE && cycleModes[currentCycleIndex] == MODE_SCROLL)) {
+    // Only animate scroll for message mode
+    DisplayMode activeMode = currentSettings.mode;
+    if (currentSettings.mode == MODE_AUTO_CYCLE) {
+        activeMode = cycleModes[currentCycleIndex];
+    }
+
+    if (activeMode == MODE_MANUAL && isScrollInitialized) {
         display->displayAnimate();
     }
 }
@@ -92,78 +152,104 @@ void DisplayModeManager::displayCurrentMode() {
         case MODE_SCROLL:
             displayScrollText();
             break;
+        default:
+            displayClock(); // Fallback
+            break;
     }
 }
 
 void DisplayModeManager::displayManualMessage() {
-    // For manual mode, only update when message changes
-    static String lastMessage = "";
-    if (currentSettings.message != lastMessage) {
+    if (!isScrollInitialized) {
         display->displayClear();
-        display->displayText(currentSettings.message.c_str(), PA_CENTER,
-                           currentSettings.speed, 0,
-                           ANIMATION_EFFECTS[currentSettings.animationIndex].effectIn,
-                           ANIMATION_EFFECTS[currentSettings.animationIndex].effectOut);
-        lastMessage = currentSettings.message;
-        display->displayAnimate();
+
+        // Simple scroll left animation for all messages
+        if (currentSettings.message.length() <= 5) {
+            // Static display for short messages
+            display->print(currentSettings.message.c_str());
+        } else {
+            // Simple scroll left for longer messages
+            display->displayText(currentSettings.message.c_str(), PA_CENTER,
+                               currentSettings.speed, 0, PA_SCROLL_LEFT, PA_SCROLL_LEFT);
+        }
+        isScrollInitialized = true;
+        Logger::debug("Message display initialized: '" + currentSettings.message + "'", "DISPLAY");
     }
 }
 
 void DisplayModeManager::displayClock() {
-    if (millis() - lastDisplayUpdate >= 1000) { // Update every second
-        lastDisplayUpdate = millis();
-        String timeStr = TimeManager::getTimeString();
-        display->print(timeStr.c_str());
-    }
+    String timeStr = TimeManager::getTimeString();
+    display->print(timeStr.c_str());
+    Logger::debug("Clock display: " + timeStr, "DISPLAY");
 }
 
 void DisplayModeManager::displayDay() {
-    String dayStr = TimeManager::getDayString();
-    display->print(dayStr.c_str());
+    String currentDay = TimeManager::getDayString();
+    display->print(currentDay.c_str());
+    Logger::debug("Day display: " + currentDay, "DISPLAY");
 }
 
 void DisplayModeManager::displayDate() {
-    String dateStr = TimeManager::getDateString();
-    display->print(dateStr.c_str());
+    String currentDate = TimeManager::getDateString(); // Always "20 JAN" format
+    display->print(currentDate.c_str());
+    Logger::debug("Date display: " + currentDate, "DISPLAY");
 }
 
 void DisplayModeManager::displayScrollText() {
-    if (!isScrollInitialized) {
-        display->displayText(currentSettings.message.c_str(), PA_CENTER,
-                           100, 100, PA_SCROLL_LEFT, PA_SCROLL_LEFT);
-        isScrollInitialized = true;
-    }
-}
-
-void DisplayModeManager::nextMode() {
-    lastModeSwitch = millis();
-
-    if (currentSettings.mode == MODE_AUTO_CYCLE) {
-        currentCycleIndex = (currentCycleIndex + 1) % 4; // 4 modes in cycle
-        display->displayClear();
-        isScrollInitialized = false;
-
-        Logger::debug("Switched to mode: " + String(currentCycleIndex) +
-                     " (" + getCurrentModeString() + ")", "DISPLAY");
-    }
+    displayManualMessage();
 }
 
 void DisplayModeManager::setSettings(const DisplaySettings& settings) {
     bool modeChanged = (settings.mode != currentSettings.mode);
     bool brightnessChanged = (settings.brightness != currentSettings.brightness);
+    bool messageChanged = (settings.message != currentSettings.message);
+    bool speedChanged = (settings.speed != currentSettings.speed);
 
+    bool modeSettingsChanged = (
+        settings.modeSettings.clockEnabled != currentSettings.modeSettings.clockEnabled ||
+        settings.modeSettings.dayEnabled != currentSettings.modeSettings.dayEnabled ||
+        settings.modeSettings.dateEnabled != currentSettings.modeSettings.dateEnabled ||
+        settings.modeSettings.messageEnabled != currentSettings.modeSettings.messageEnabled ||
+        settings.modeSettings.cycleInterval != currentSettings.modeSettings.cycleInterval
+    );
+
+    // Log changes
+    if (modeChanged) {
+        Logger::info("Mode changed from " + getCurrentModeString() + " to " + String(settings.mode), "DISPLAY");
+    }
+    if (messageChanged) {
+        Logger::info("Message changed from '" + currentSettings.message + "' to '" + settings.message + "'", "DISPLAY");
+    }
+    if (brightnessChanged) {
+        Logger::info("Brightness changed from " + String(currentSettings.brightness) + " to " + String(settings.brightness), "DISPLAY");
+    }
+
+    // Update settings
     currentSettings = settings;
 
-    if (brightnessChanged) {
+    // Apply brightness change immediately
+    if (brightnessChanged && display) {
         display->setIntensity(currentSettings.brightness);
     }
 
-    if (modeChanged) {
-        display->displayClear();
+    // Reset display state if significant changes occurred
+    if (modeChanged || messageChanged || speedChanged || modeSettingsChanged) {
+        if (display) {
+            display->displayClear();
+        }
         isScrollInitialized = false;
         lastModeSwitch = millis();
-        currentCycleIndex = 0; // Reset cycle
-        Logger::info("Display mode changed to: " + getCurrentModeString(), "DISPLAY");
+        currentCycleIndex = 0; // Reset cycle position
+
+        Logger::info("Display reset due to settings change", "DISPLAY");
+    }
+
+    // Log current mode settings
+    if (modeSettingsChanged) {
+        Logger::info("Mode settings updated - Clock:" + String(currentSettings.modeSettings.clockEnabled ? "ON" : "OFF") +
+                    " Day:" + String(currentSettings.modeSettings.dayEnabled ? "ON" : "OFF") +
+                    " Date:" + String(currentSettings.modeSettings.dateEnabled ? "ON" : "OFF") +
+                    " Message:" + String(currentSettings.modeSettings.messageEnabled ? "ON" : "OFF") +
+                    " Interval:" + String(currentSettings.modeSettings.cycleInterval) + "s", "DISPLAY");
     }
 }
 
@@ -173,26 +259,69 @@ DisplaySettings DisplayModeManager::getSettings() {
 
 void DisplayModeManager::setMode(DisplayMode mode) {
     if (mode != currentSettings.mode) {
+        Logger::info("Mode manually changed from " + getCurrentModeString() + " to " + String(mode), "DISPLAY");
         currentSettings.mode = mode;
-        display->displayClear();
+
+        if (display) {
+            display->displayClear();
+        }
         isScrollInitialized = false;
         lastModeSwitch = millis();
-        Logger::info("Mode manually set to: " + getCurrentModeString(), "DISPLAY");
+        currentCycleIndex = 0;
     }
 }
 
 void DisplayModeManager::enableAutoCycle(bool enable) {
-    currentSettings.autoCycleEnabled = enable;
-    Logger::info("Auto cycle " + String(enable ? "enabled" : "disabled"), "DISPLAY");
+    if (enable != currentSettings.autoCycleEnabled) {
+        currentSettings.autoCycleEnabled = enable;
+        Logger::info("Auto cycle " + String(enable ? "enabled" : "disabled"), "DISPLAY");
+
+        if (enable) {
+            lastModeSwitch = millis(); // Reset timer when enabling
+        }
+    }
+}
+
+void DisplayModeManager::nextMode() {
+    lastModeSwitch = millis();
+
+    if (currentSettings.mode == MODE_AUTO_CYCLE) {
+        DisplayMode nextMode = getNextEnabledMode();
+        if (display) {
+            display->displayClear();
+        }
+        isScrollInitialized = false;
+
+        String modeName = "";
+        switch (nextMode) {
+            case MODE_CLOCK: modeName = "CLOCK"; break;
+            case MODE_DAY: modeName = "DAY"; break;
+            case MODE_DATE: modeName = "DATE"; break;
+            case MODE_MANUAL: modeName = "MESSAGE"; break;
+            default: modeName = "UNKNOWN"; break;
+        }
+
+        Logger::info("Auto cycle switched to: " + String(nextMode) + " (" + modeName + ")", "DISPLAY");
+    } else {
+        // Manual mode cycling through all modes
+        int nextModeInt = (static_cast<int>(currentSettings.mode) + 1) % 6;
+        currentSettings.mode = static_cast<DisplayMode>(nextModeInt);
+
+        if (display) {
+            display->displayClear();
+        }
+        isScrollInitialized = false;
+        Logger::info("Manual cycle to: " + getCurrentModeString(), "DISPLAY");
+    }
 }
 
 String DisplayModeManager::getCurrentModeString() {
     switch (currentSettings.mode) {
-        case MODE_MANUAL: return "Manual Message";
-        case MODE_CLOCK: return "Clock Display";
-        case MODE_DAY: return "Day Display";
-        case MODE_DATE: return "Date Display";
-        case MODE_SCROLL: return "Scroll Text";
+        case MODE_MANUAL: return "Message Only";
+        case MODE_CLOCK: return "Clock Only";
+        case MODE_DAY: return "Day Only";
+        case MODE_DATE: return "Date Only";
+        case MODE_SCROLL: return "Scroll Only";
         case MODE_AUTO_CYCLE: return "Auto Cycle";
         default: return "Unknown Mode";
     }
@@ -200,4 +329,9 @@ String DisplayModeManager::getCurrentModeString() {
 
 bool DisplayModeManager::isAutoCycleMode() {
     return currentSettings.mode == MODE_AUTO_CYCLE;
+}
+
+void DisplayModeManager::initializeScrollText() {
+    // This method is called internally by displayManualMessage
+    // Left here for compatibility but functionality moved to displayManualMessage
 }
