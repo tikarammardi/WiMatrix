@@ -21,9 +21,24 @@
 #define MIN_SPEED 20
 #define MAX_SPEED 200
 
+// Time Display Settings
+#define MODE_SWITCH_INTERVAL 5000  // 5 seconds between modes
+#define NTP_UPDATE_INTERVAL 60000  // Update NTP every minute
+#define IST_OFFSET 19800          // IST offset in seconds (5.5 hours)
+
 // WiFi Configuration
 #define WIFI_CONNECTION_TIMEOUT 30  // seconds
 #define WIFI_RETRY_DELAY 1000       // milliseconds
+
+// Display Modes
+enum DisplayMode {
+    MODE_MANUAL,     // Manual message control via web
+    MODE_CLOCK,      // Time display
+    MODE_DAY,        // Day of week
+    MODE_DATE,       // Date display
+    MODE_SCROLL,     // Scroll text
+    MODE_AUTO_CYCLE  // Auto cycle through all modes
+};
 
 // Animation Effects
 struct AnimationEffect {
@@ -47,5 +62,18 @@ static const AnimationEffect ANIMATION_EFFECTS[] = {
 };
 
 #define ANIMATION_COUNT (sizeof(ANIMATION_EFFECTS) / sizeof(AnimationEffect))
+
+// Time Display Constants
+static const char* DAYS_OF_WEEK[] = {
+    "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"
+};
+
+static const char* MONTHS_OF_YEAR[] = {
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+};
+
+#define DAYS_COUNT 7
+#define MONTHS_COUNT 12
 
 #endif // CONFIG_H

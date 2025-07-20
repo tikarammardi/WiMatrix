@@ -6,6 +6,8 @@
 #include "Config.h"
 #include "Logger.h"
 #include "WebTemplates.h"
+#include "TimeManager.h"
+#include "DisplayModeManager.h"
 
 // Create display instance
 MD_Parola display = MD_Parola(HARDWARE_TYPE, DATA_PIN, CLK_PIN, CS_PIN, MAX_DEVICES);
@@ -17,37 +19,17 @@ const char* password = WIFI_PASSWORD;
 // Create web server on port 80
 ESP8266WebServer server(80);
 
-// Current display settings
-DisplaySettings currentSettings = {
-    "Welcome to WiMatrix!",  // message
-    DEFAULT_BRIGHTNESS,      // brightness
-    DEFAULT_SCROLL_SPEED,    // speed
-    0                        // animationIndex (Scroll Left)
-};
-
-// Helper function to update LED display
-void updateLEDDisplay() {
-    display.displayClear();
-    display.setIntensity(currentSettings.brightness);
-
-    textEffect_t effect = ANIMATION_EFFECTS[currentSettings.animationIndex].effectIn;
-    display.displayText(currentSettings.message.c_str(), PA_CENTER, currentSettings.speed, 0, effect, effect);
-
-    Logger::info("Display updated - Message: '" + currentSettings.message +
-                "', Brightness: " + String(currentSettings.brightness) +
-                ", Speed: " + String(currentSettings.speed) +
-                ", Animation: " + String(ANIMATION_EFFECTS[currentSettings.animationIndex].name), "DISPLAY");
-}
-
-// Web server handlers
+// Web server handlers (updated to include mode control)
 void handleRoot() {
-    String html = WebTemplates::getMainPage(WiFi.SSID(), WiFi.localIP().toString(), currentSettings);
+    DisplaySettings settings = DisplayModeManager::getSettings();
+    String html = WebTemplates::getMainPage(WiFi.SSID(), WiFi.localIP().toString(), settings);
     server.send(200, "text/html", html);
     Logger::logWebRequest("GET", "/", 200);
 }
 
 void handleMessageUpdate() {
     if (server.method() == HTTP_POST) {
+        DisplaySettings settings = DisplayModeManager::getSettings();
         bool settingsChanged = false;
 
         // Update message
@@ -57,48 +39,49 @@ void handleMessageUpdate() {
             if (newMessage.length() == 0) {
                 newMessage = "Empty Message";
             }
-            if (newMessage != currentSettings.message) {
-                currentSettings.message = newMessage;
+            if (newMessage != settings.message) {
+                settings.message = newMessage;
                 settingsChanged = true;
             }
         }
 
-        // Update brightness
+        // Update display mode
+        if (server.hasArg("mode")) {
+            int newMode = server.arg("mode").toInt();
+            if (newMode >= 0 && newMode <= MODE_AUTO_CYCLE) {
+                settings.mode = (DisplayMode)newMode;
+                settingsChanged = true;
+            }
+        }
+
+        // Update other settings (brightness, speed, animation)
         if (server.hasArg("brightness")) {
             int newBrightness = server.arg("brightness").toInt();
             if (newBrightness >= MIN_BRIGHTNESS && newBrightness <= MAX_BRIGHTNESS) {
-                if (newBrightness != currentSettings.brightness) {
-                    currentSettings.brightness = newBrightness;
-                    settingsChanged = true;
-                }
+                settings.brightness = newBrightness;
+                settingsChanged = true;
             }
         }
 
-        // Update speed
         if (server.hasArg("speed")) {
             int newSpeed = server.arg("speed").toInt();
             if (newSpeed >= MIN_SPEED && newSpeed <= MAX_SPEED) {
-                if (newSpeed != currentSettings.speed) {
-                    currentSettings.speed = newSpeed;
-                    settingsChanged = true;
-                }
+                settings.speed = newSpeed;
+                settingsChanged = true;
             }
         }
 
-        // Update animation
         if (server.hasArg("animation")) {
             int newAnimation = server.arg("animation").toInt();
             if (newAnimation >= 0 && newAnimation < ANIMATION_COUNT) {
-                if (newAnimation != currentSettings.animationIndex) {
-                    currentSettings.animationIndex = newAnimation;
-                    settingsChanged = true;
-                }
+                settings.animationIndex = newAnimation;
+                settingsChanged = true;
             }
         }
 
-        // Apply changes to LED display
+        // Apply changes
         if (settingsChanged) {
-            updateLEDDisplay();
+            DisplayModeManager::setSettings(settings);
             Logger::info("Settings updated via web interface", "WEB");
         }
 
@@ -109,18 +92,22 @@ void handleMessageUpdate() {
         server.send(302, "text/plain", "");
 
     } else {
-        Logger::warn("Non-POST request to /update endpoint", "WEB");
         server.send(405, "text/plain", "Method Not Allowed");
     }
 }
 
 void handleGetSettings() {
+    DisplaySettings settings = DisplayModeManager::getSettings();
+
     String json = "{";
-    json += "\"message\":\"" + currentSettings.message + "\",";
-    json += "\"brightness\":" + String(currentSettings.brightness) + ",";
-    json += "\"speed\":" + String(currentSettings.speed) + ",";
-    json += "\"animation\":" + String(currentSettings.animationIndex) + ",";
-    json += "\"animationName\":\"" + String(ANIMATION_EFFECTS[currentSettings.animationIndex].name) + "\"";
+    json += "\"message\":\"" + settings.message + "\",";
+    json += "\"brightness\":" + String(settings.brightness) + ",";
+    json += "\"speed\":" + String(settings.speed) + ",";
+    json += "\"animation\":" + String(settings.animationIndex) + ",";
+    json += "\"mode\":" + String(settings.mode) + ",";
+    json += "\"autoCycle\":" + String(settings.autoCycleEnabled ? "true" : "false") + ",";
+    json += "\"currentTime\":\"" + TimeManager::getFullDateTime() + "\",";
+    json += "\"timeSet\":" + String(TimeManager::isTimeSet() ? "true" : "false");
     json += "}";
 
     server.send(200, "application/json", json);
@@ -145,16 +132,8 @@ void setup() {
     Logger::setLogLevel(LOG_INFO);
     Logger::logSystemInfo();
 
-    // Initialize display
-    Logger::info("Initializing LED display...", "DISPLAY");
-    display.begin();
-    updateLEDDisplay();  // Apply initial settings
-    Logger::info("LED display initialized successfully", "DISPLAY");
-
-    // Connect to WiFi
+    // Connect to WiFi first (needed for NTP)
     Logger::info("Starting WiFi connection...", "NETWORK");
-    Logger::info("Connecting to: " + String(ssid), "NETWORK");
-
     WiFi.mode(WIFI_STA);
     WiFi.begin(ssid, password);
 
@@ -162,10 +141,6 @@ void setup() {
     while (WiFi.status() != WL_CONNECTED && attempts < WIFI_CONNECTION_TIMEOUT) {
         delay(WIFI_RETRY_DELAY);
         attempts++;
-
-        String connectMsg = "WiFi... " + String(attempts) + "/" + String(WIFI_CONNECTION_TIMEOUT);
-        display.displayClear();
-        display.displayText(connectMsg.c_str(), PA_CENTER, 50, 0, PA_SCROLL_LEFT, PA_SCROLL_LEFT);
 
         if (attempts % 5 == 0) {
             Logger::debug("WiFi connection attempt " + String(attempts), "NETWORK");
@@ -176,6 +151,12 @@ void setup() {
         Logger::info("WiFi connected successfully!", "NETWORK");
         Logger::logNetworkInfo();
 
+        // Initialize time management (requires WiFi)
+        TimeManager::init();
+
+        // Initialize display mode manager
+        DisplayModeManager::init(&display);
+
         // Setup web server routes
         Logger::info("Starting web server...", "WEB");
         server.on("/", HTTP_GET, handleRoot);
@@ -185,50 +166,41 @@ void setup() {
         server.onNotFound(handleNotFound);
         server.begin();
 
-        Logger::info("Web server started on port 80", "WEB");
-        Logger::info("Available routes: /, /update, /api/uptime, /api/settings", "WEB");
+        Logger::info("Web server started with time display features", "WEB");
         Logger::info("Access URL: http://" + WiFi.localIP().toString(), "WEB");
 
-        // Show web server ready on display briefly, then restore current message
-        String serverMsg = "Advanced Web Ready! " + WiFi.localIP().toString();
-        display.displayClear();
-        display.displayText(serverMsg.c_str(), PA_CENTER, 40, 3000, PA_SCROLL_LEFT, PA_NO_EFFECT);
-
     } else {
-        Logger::error("WiFi connection failed after " + String(attempts) + " attempts", "NETWORK");
-        display.displayClear();
-        display.displayText("WiFi Failed - No Web Server", PA_CENTER, 50, 0, PA_SCROLL_LEFT, PA_SCROLL_LEFT);
+        Logger::error("WiFi connection failed - time features disabled", "NETWORK");
+        // Still initialize display for basic operation
+        DisplayModeManager::init(&display);
     }
 
-    Logger::info("Setup complete", "SYSTEM");
+    Logger::info("Setup complete with integrated time display", "SYSTEM");
 }
 
 void loop() {
     // Handle web server requests
     server.handleClient();
 
-    // Keep display animating
-    if (display.displayAnimate()) {
-        // Animation cycle complete - restart with current settings
-        updateLEDDisplay();
-    }
+    // Update time manager (NTP sync)
+    TimeManager::update();
 
-    // Monitor system status every 30 seconds
+    // Update display mode manager (handles all mode switching and display)
+    DisplayModeManager::update();
+
+    // System status monitoring
     static unsigned long lastStatusCheck = 0;
     if (millis() - lastStatusCheck > 30000) {
         lastStatusCheck = millis();
 
+        DisplaySettings settings = DisplayModeManager::getSettings();
         if (WiFi.status() == WL_CONNECTED) {
-            Logger::info("System online | Current: '" + currentSettings.message +
-                        "' | Brightness: " + String(currentSettings.brightness) +
-                        " | Speed: " + String(currentSettings.speed) +
-                        " | Animation: " + String(ANIMATION_EFFECTS[currentSettings.animationIndex].name) +
+            Logger::info("System online | Mode: " + DisplayModeManager::getCurrentModeString() +
+                        " | Time: " + TimeManager::getFullDateTime() +
                         " | Uptime: " + String(millis() / 1000) + "s", "STATUS");
         } else {
             Logger::warn("WiFi disconnected - attempting reconnection", "NETWORK");
             WiFi.reconnect();
-            display.displayClear();
-            display.displayText("Reconnecting WiFi...", PA_CENTER, DEFAULT_SCROLL_SPEED, 0, PA_SCROLL_LEFT, PA_SCROLL_LEFT);
         }
     }
 }

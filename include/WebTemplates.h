@@ -2,13 +2,9 @@
 #define WEB_TEMPLATES_H
 
 #include <Arduino.h>
+#include "DisplayModeManager.h"
 
-struct DisplaySettings {
-    String message;
-    int brightness;
-    int speed;
-    int animationIndex;
-};
+
 
 class WebTemplates {
 public:
