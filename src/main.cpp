@@ -17,11 +17,54 @@ const char* password = WIFI_PASSWORD;
 // Create web server on port 80
 ESP8266WebServer server(80);
 
+// Current message state
+String currentMessage = "Welcome to WiMatrix!";
+
 // Web server handlers
 void handleRoot() {
-    String html = WebTemplates::getMainPage(WiFi.SSID(), WiFi.localIP().toString());
+    String html = WebTemplates::getMainPage(WiFi.SSID(), WiFi.localIP().toString(), currentMessage);
     server.send(200, "text/html", html);
     Logger::logWebRequest("GET", "/", 200);
+}
+
+void handleMessageUpdate() {
+    if (server.method() == HTTP_POST) {
+        if (server.hasArg("message")) {
+            String newMessage = server.arg("message");
+
+            // Trim whitespace and validate
+            newMessage.trim();
+            if (newMessage.length() == 0) {
+                newMessage = "Empty Message";
+            }
+
+            // Update current message
+            String oldMessage = currentMessage;
+            currentMessage = newMessage;
+
+            // Update LED display
+            display.displayClear();
+            display.displayText(currentMessage.c_str(), PA_CENTER, DEFAULT_SCROLL_SPEED, 0, PA_SCROLL_LEFT, PA_SCROLL_LEFT);
+
+            Logger::info("Message updated: '" + oldMessage + "' -> '" + currentMessage + "'", "MESSAGE");
+            Logger::logWebRequest("POST", "/update", 200);
+
+            // Redirect back to main page to show updated message
+            server.sendHeader("Location", "/");
+            server.send(302, "text/plain", "");
+        } else {
+            Logger::warn("POST /update received without 'message' parameter", "WEB");
+            server.send(400, "text/plain", "Bad Request: Missing 'message' parameter");
+        }
+    } else {
+        Logger::warn("Non-POST request to /update endpoint", "WEB");
+        server.send(405, "text/plain", "Method Not Allowed");
+    }
+}
+
+void handleGetMessage() {
+    server.send(200, "application/json", "{\"message\":\"" + currentMessage + "\"}");
+    Logger::logWebRequest("GET", "/api/message", 200);
 }
 
 void handleUptime() {
@@ -47,8 +90,8 @@ void setup() {
     display.begin();
     display.setIntensity(DEFAULT_BRIGHTNESS);
     display.displayClear();
-    display.displayText("Starting Web Server...", PA_CENTER, DEFAULT_SCROLL_SPEED, 0, PA_SCROLL_LEFT, PA_SCROLL_LEFT);
-    Logger::info("LED display initialized successfully", "DISPLAY");
+    display.displayText(currentMessage.c_str(), PA_CENTER, DEFAULT_SCROLL_SPEED, 0, PA_SCROLL_LEFT, PA_SCROLL_LEFT);
+    Logger::info("LED display initialized with message: '" + currentMessage + "'", "DISPLAY");
 
     // Connect to WiFi
     Logger::info("Starting WiFi connection...", "NETWORK");
@@ -78,16 +121,19 @@ void setup() {
         // Setup web server routes
         Logger::info("Starting web server...", "WEB");
         server.on("/", HTTP_GET, handleRoot);
+        server.on("/update", HTTP_POST, handleMessageUpdate);
         server.on("/api/uptime", HTTP_GET, handleUptime);
+        server.on("/api/message", HTTP_GET, handleGetMessage);
         server.onNotFound(handleNotFound);
         server.begin();
         Logger::info("Web server started on port 80", "WEB");
+        Logger::info("Available routes: /, /update, /api/uptime, /api/message", "WEB");
         Logger::info("Access URL: http://" + WiFi.localIP().toString(), "WEB");
 
         // Show web server ready on display
-        String serverMsg = "Web Server Ready! " + WiFi.localIP().toString();
+        String serverMsg = "Web Ready! " + WiFi.localIP().toString();
         display.displayClear();
-        display.displayText(serverMsg.c_str(), PA_CENTER, 40, 5000, PA_SCROLL_LEFT, PA_NO_EFFECT);
+        display.displayText(serverMsg.c_str(), PA_CENTER, 40, 3000, PA_SCROLL_LEFT, PA_NO_EFFECT);
 
     } else {
         Logger::error("WiFi connection failed after " + String(attempts) + " attempts", "NETWORK");
@@ -104,12 +150,8 @@ void loop() {
 
     // Keep display animating
     if (display.displayAnimate()) {
-        if (WiFi.status() == WL_CONNECTED) {
-            String statusMsg = "Web: http://" + WiFi.localIP().toString();
-            display.displayText(statusMsg.c_str(), PA_CENTER, DEFAULT_SCROLL_SPEED, 0, PA_SCROLL_LEFT, PA_SCROLL_LEFT);
-        } else {
-            display.displayText("WiFi Disconnected", PA_CENTER, DEFAULT_SCROLL_SPEED, 0, PA_SCROLL_LEFT, PA_SCROLL_LEFT);
-        }
+        // After temporary messages (like IP display), restore current message
+        display.displayText(currentMessage.c_str(), PA_CENTER, DEFAULT_SCROLL_SPEED, 0, PA_SCROLL_LEFT, PA_SCROLL_LEFT);
     }
 
     // Monitor system status every 30 seconds
@@ -118,10 +160,12 @@ void loop() {
         lastStatusCheck = millis();
 
         if (WiFi.status() == WL_CONNECTED) {
-            Logger::info("System online | Uptime: " + String(millis() / 1000) + "s", "STATUS");
+            Logger::info("System online | Message: '" + currentMessage + "' | Uptime: " + String(millis() / 1000) + "s", "STATUS");
         } else {
             Logger::warn("WiFi disconnected - attempting reconnection", "NETWORK");
             WiFi.reconnect();
+            display.displayClear();
+            display.displayText("Reconnecting WiFi...", PA_CENTER, DEFAULT_SCROLL_SPEED, 0, PA_SCROLL_LEFT, PA_SCROLL_LEFT);
         }
     }
 }
