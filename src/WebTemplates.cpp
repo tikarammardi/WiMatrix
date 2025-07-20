@@ -1,7 +1,5 @@
-//
-// Created by Tikaram Mardi on 19/07/25.
-//
 #include "WebTemplates.h"
+#include "Config.h"
 
 String WebTemplates::getCommonCSS() {
     return R"rawliteral(
@@ -13,7 +11,7 @@ String WebTemplates::getCommonCSS() {
             min-height: 100vh;
         }
         .container {
-            max-width: 600px;
+            max-width: 700px;
             margin: 0 auto;
             background: white;
             padding: 30px;
@@ -40,6 +38,13 @@ String WebTemplates::getCommonCSS() {
             margin: 20px 0;
             border-left: 4px solid #9c27b0;
         }
+        .advanced-section {
+            background: linear-gradient(135deg, #e8f5e8 0%, #c8e6c9 100%);
+            padding: 25px;
+            border-radius: 10px;
+            margin: 20px 0;
+            border-left: 4px solid #4caf50;
+        }
         .status-online { color: #4caf50; font-weight: bold; }
         .ip-address {
             font-family: 'Courier New', monospace;
@@ -47,9 +52,6 @@ String WebTemplates::getCommonCSS() {
             padding: 5px 10px;
             border-radius: 4px;
             display: inline-block;
-        }
-        .message-form {
-            margin-top: 15px;
         }
         .message-input {
             width: 100%;
@@ -66,35 +68,82 @@ String WebTemplates::getCommonCSS() {
             border-color: #9c27b0;
             box-shadow: 0 0 0 3px rgba(156, 39, 176, 0.1);
         }
+        .control-group {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        .control-item {
+            flex: 1;
+            min-width: 200px;
+        }
+        .control-label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #333;
+        }
+        .range-input, .select-input {
+            width: 100%;
+            padding: 8px;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+        .range-input {
+            -webkit-appearance: none;
+            height: 8px;
+            background: #ddd;
+            outline: none;
+        }
+        .range-input::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            background: #4caf50;
+            cursor: pointer;
+            border-radius: 50%;
+        }
+        .value-display {
+            background: #f5f5f5;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 14px;
+            display: inline-block;
+            margin-left: 10px;
+        }
         .submit-btn {
-            background: linear-gradient(135deg, #9c27b0 0%, #673ab7 100%);
+            background: linear-gradient(135deg, #4caf50 0%, #45a049 100%);
             color: white;
-            padding: 12px 30px;
+            padding: 15px 30px;
             border: none;
             border-radius: 8px;
             font-size: 16px;
             cursor: pointer;
             transition: transform 0.2s ease;
-            margin-right: 10px;
+            margin-right: 15px;
         }
         .submit-btn:hover {
             transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(156, 39, 176, 0.3);
+            box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
         }
-        .clear-btn {
+        .reset-btn {
             background: #757575;
             color: white;
-            padding: 12px 20px;
+            padding: 15px 25px;
             border: none;
             border-radius: 8px;
             font-size: 16px;
             cursor: pointer;
             transition: background 0.3s ease;
         }
-        .clear-btn:hover {
+        .reset-btn:hover {
             background: #616161;
         }
-        .current-message {
+        .current-settings {
             background: #f5f5f5;
             padding: 15px;
             border-radius: 8px;
@@ -111,6 +160,10 @@ String WebTemplates::getCommonCSS() {
             text-align: center;
             font-size: 14px;
             letter-spacing: 2px;
+            min-height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
         .char-counter {
             text-align: right;
@@ -134,52 +187,111 @@ String WebTemplates::getSystemInfoSection() {
     )rawliteral";
 }
 
-String WebTemplates::getMessageFormSection(const String& currentMessage) {
-    String formSection = R"rawliteral(
-        <div class="form-section">
-            <h3>💬 Message Control</h3>
-            <p>Enter your custom message to display on the LED matrix:</p>
+String WebTemplates::getAnimationOptionsHTML(int selectedIndex) {
+    String options = "";
+    for (int i = 0; i < ANIMATION_COUNT; i++) {
+        String selected = (i == selectedIndex) ? " selected" : "";
+        options += "<option value=\"" + String(i) + "\"" + selected + ">" +
+                   String(ANIMATION_EFFECTS[i].name) + "</option>";
+    }
+    return options;
+}
 
-            <form method="POST" action="/update" class="message-form">
-                <input type="text"
-                       name="message"
-                       class="message-input"
-                       placeholder="Enter your message here..."
-                       value="%CURRENT_MESSAGE%"
-                       maxlength="100"
-                       id="messageInput"
-                       autocomplete="off">
-                <div class="char-counter">
-                    <span id="charCount">0</span>/100 characters
+String WebTemplates::getAdvancedControlsSection(const DisplaySettings& settings) {
+    String controlsSection = R"rawliteral(
+        <div class="advanced-section">
+            <h3>⚙️ Advanced Display Controls</h3>
+
+            <form method="POST" action="/update" id="displayForm">
+                <!-- Message Input -->
+                <div style="margin-bottom: 20px;">
+                    <label class="control-label" for="messageInput">💬 Message Text</label>
+                    <input type="text"
+                           name="message"
+                           id="messageInput"
+                           class="message-input"
+                           placeholder="Enter your message here..."
+                           value="%MESSAGE%"
+                           maxlength="100"
+                           autocomplete="off">
+                    <div class="char-counter">
+                        <span id="charCount">0</span>/100 characters
+                    </div>
                 </div>
-                <div style="margin-top: 15px;">
+
+                <!-- Advanced Controls -->
+                <div class="control-group">
+                    <div class="control-item">
+                        <label class="control-label" for="brightness">💡 Brightness</label>
+                        <input type="range"
+                               name="brightness"
+                               id="brightness"
+                               class="range-input"
+                               min="0" max="15"
+                               value="%BRIGHTNESS%">
+                        <span class="value-display"><span id="brightnessValue">%BRIGHTNESS%</span>/15</span>
+                    </div>
+
+                    <div class="control-item">
+                        <label class="control-label" for="speed">⚡ Animation Speed</label>
+                        <input type="range"
+                               name="speed"
+                               id="speed"
+                               class="range-input"
+                               min="20" max="200"
+                               value="%SPEED%">
+                        <span class="value-display"><span id="speedValue">%SPEED%</span>ms</span>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <div class="control-item">
+                        <label class="control-label" for="animation">🎭 Animation Effect</label>
+                        <select name="animation" id="animation" class="select-input">
+                            %ANIMATION_OPTIONS%
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Buttons -->
+                <div style="margin-top: 25px;">
                     <button type="submit" class="submit-btn">🚀 Update Display</button>
-                    <button type="button" class="clear-btn" onclick="clearMessage()">🗑️ Clear</button>
+                    <button type="button" class="reset-btn" onclick="resetToDefaults()">🔄 Reset Defaults</button>
                 </div>
             </form>
 
-            <div class="current-message">
-                <strong>Current Message:</strong> "<span id="currentMsg">%CURRENT_MESSAGE%</span>"
+            <!-- Current Settings Display -->
+            <div class="current-settings">
+                <h4>📊 Current Settings</h4>
+                <p><strong>Message:</strong> "<span id="currentMsg">%MESSAGE%</span>"</p>
+                <p><strong>Brightness:</strong> <span id="currentBrightness">%BRIGHTNESS%</span>/15</p>
+                <p><strong>Speed:</strong> <span id="currentSpeed">%SPEED%</span>ms</p>
+                <p><strong>Animation:</strong> <span id="currentAnimation">%ANIMATION_NAME%</span></p>
             </div>
 
-            <div class="preview-box" id="previewBox">
-                %CURRENT_MESSAGE%
-            </div>
+            <!-- Live Preview -->
+            <div class="preview-box" id="previewBox">%MESSAGE%</div>
         </div>
     )rawliteral";
 
-    formSection.replace("%CURRENT_MESSAGE%", currentMessage);
-    return formSection;
+    // Replace placeholders
+    controlsSection.replace("%MESSAGE%", settings.message);
+    controlsSection.replace("%BRIGHTNESS%", String(settings.brightness));
+    controlsSection.replace("%SPEED%", String(settings.speed));
+    controlsSection.replace("%ANIMATION_OPTIONS%", getAnimationOptionsHTML(settings.animationIndex));
+    controlsSection.replace("%ANIMATION_NAME%", String(ANIMATION_EFFECTS[settings.animationIndex].name));
+
+    return controlsSection;
 }
 
-String WebTemplates::getMainPage(const String& networkSSID, const String& ipAddress, const String& currentMessage) {
+String WebTemplates::getMainPage(const String& networkSSID, const String& ipAddress, const DisplaySettings& settings) {
     String html = R"rawliteral(
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WiMatrix Controller</title>
+    <title>WiMatrix Advanced Controller</title>
     <style>
     )rawliteral";
 
@@ -202,12 +314,12 @@ String WebTemplates::getMainPage(const String& networkSSID, const String& ipAddr
     )rawliteral";
 
     html += getSystemInfoSection();
-    html += getMessageFormSection(currentMessage);
+    html += getAdvancedControlsSection(settings);
 
     html += R"rawliteral(
 
         <div style="text-align: center; margin-top: 30px; color: #666;">
-            <small>WiMatrix v1.0 | Powered by ESP8266</small>
+            <small>WiMatrix v2.0 | Advanced LED Matrix Controller</small>
         </div>
     </div>
 
@@ -222,7 +334,7 @@ String WebTemplates::getMainPage(const String& networkSSID, const String& ipAddr
                 .catch(err => console.log('Uptime fetch failed:', err));
         }
 
-        // Update character counter
+        // Update character counter and preview
         function updateCharCounter() {
             const input = document.getElementById('messageInput');
             const counter = document.getElementById('charCount');
@@ -241,20 +353,43 @@ String WebTemplates::getMainPage(const String& networkSSID, const String& ipAddr
             }
         }
 
-        // Clear message function
-        function clearMessage() {
-            const input = document.getElementById('messageInput');
-            input.value = '';
-            updateCharCounter();
-            input.focus();
+        // Update brightness value display
+        function updateBrightnessDisplay() {
+            const slider = document.getElementById('brightness');
+            const display = document.getElementById('brightnessValue');
+            display.textContent = slider.value;
         }
 
-        // Initialize
-        document.getElementById('messageInput').addEventListener('input', updateCharCounter);
+        // Update speed value display
+        function updateSpeedDisplay() {
+            const slider = document.getElementById('speed');
+            const display = document.getElementById('speedValue');
+            display.textContent = slider.value;
+        }
 
+        // Reset to default values
+        function resetToDefaults() {
+            document.getElementById('messageInput').value = 'Welcome to WiMatrix!';
+            document.getElementById('brightness').value = '5';
+            document.getElementById('speed').value = '60';
+            document.getElementById('animation').value = '0';
+
+            updateCharCounter();
+            updateBrightnessDisplay();
+            updateSpeedDisplay();
+        }
+
+        // Initialize event listeners
+        document.getElementById('messageInput').addEventListener('input', updateCharCounter);
+        document.getElementById('brightness').addEventListener('input', updateBrightnessDisplay);
+        document.getElementById('speed').addEventListener('input', updateSpeedDisplay);
+
+        // Initialize displays
         setInterval(updateUptime, 1000);
         updateUptime();
         updateCharCounter();
+        updateBrightnessDisplay();
+        updateSpeedDisplay();
     </script>
 </body>
 </html>
@@ -268,6 +403,7 @@ String WebTemplates::getMainPage(const String& networkSSID, const String& ipAddr
 }
 
 String WebTemplates::get404Page(const String& uri, const String& method, int args) {
+    // Keep existing 404 page implementation
     String html = R"rawliteral(
 <!DOCTYPE html>
 <html lang="en">
@@ -305,7 +441,6 @@ String WebTemplates::get404Page(const String& uri, const String& method, int arg
 </html>
     )rawliteral";
 
-    // Replace placeholders
     html.replace("%URI%", uri);
     html.replace("%METHOD%", method);
     html.replace("%ARGS%", String(args));
